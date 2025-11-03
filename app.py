@@ -1,26 +1,21 @@
 from flask import Flask, render_template, jsonify, request
-import os
 from datetime import datetime
 
 app = Flask(__name__)
 
-api_key = os.environ.get("KAKAO_API_KEY")
-
+# 메모리 기반 포트홀 데이터
 pothole_data = []
 
 @app.route('/')
 def dashboard():
-    """대시보드 HTML 렌더링"""
-    return render_template('dashboard.html', api_key=api_key)
+    return render_template('dashboard.html')
 
 @app.route('/api/potholes', methods=['GET'])
 def get_potholes():
-    """지도 표시용 포트홀 데이터 반환"""
     return jsonify(pothole_data)
 
 @app.route('/api/potholes', methods=['POST'])
 def add_pothole():
-    """AWS 서버에서 좌표 데이터 수신"""
     data = request.get_json()
 
     pothole_entry = {
@@ -43,5 +38,3 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
-
