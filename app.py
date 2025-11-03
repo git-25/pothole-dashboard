@@ -1,14 +1,16 @@
 from flask import Flask, render_template, jsonify, request
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
-# 메모리 기반 포트홀 데이터
+api_key = os.getenv("KAKAO_API_KEY")
+
 pothole_data = []
 
 @app.route('/')
 def dashboard():
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', api_key=api_key)
 
 @app.route('/api/potholes', methods=['GET'])
 def get_potholes():
@@ -33,8 +35,6 @@ def add_pothole():
 
     return jsonify({"message": "Pothole added successfully"}), 201
 
-
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
