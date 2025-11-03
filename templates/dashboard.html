@@ -3,89 +3,142 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>포트홀 관리 대시보</title>
+  <title>포트홀 관리 대시보드</title>
 
-  <script
-    type="text/javascript"
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ api_key }}&libraries=clusterer">
-  </script>
-
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ api_key }}&libraries=clusterer"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; text-align:center; }
-    #map { width: 100%; height: 500px; }
-    #chart { width: 300px; height: 300px; margin: 20px auto; }
-    #loading { margin-top: 20px; font-size: 20px; color: gray; }
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      background-color: #f5f6fa;
+    }
+    h2 {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      grid-template-rows: auto 1fr;
+      gap: 15px;
+      padding: 20px;
+      height: 90vh;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 15px;
+    }
+    #chart { width: 100%; height: 250px; }
+    #map { width: 100%; height: 100%; border-radius: 10px; }
+    #coords {
+      font-size: 14px;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+    #coords ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    #coords li {
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+    }
   </style>
 </head>
 <body>
   <h2>포트홀 관리 대시보드</h2>
-  <div id="map"></div>
-  <div id="loading"> 지도를 불러오는 중</div>
-  <canvas id="chart"></canvas>
+
+  <div class="container">
+    <!-- 왼쪽: 차트, 포트홀 좌표 -->
+    <div>
+      <div class="card">
+        <h3>포트홀 처리 현황</h3>
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="card" id="coords">
+        <h3>탐지된 포트홀 좌표</h3>
+        <ul id="coordList"></ul>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 지도 -->
+    <div class="card">
+      <h3>지도</h3>
+      <div id="map"></div>
+    </div>
+  </div>
 
   <script>
   let map;
   let markers = {};
 
-  window.onload = function() {
-    if (typeof kakao === "undefined") {
-      console.error("Kakao SDK가 로드X");  //API 키 확인
-      alert("카카오맵을 불러오기 실패"); //API KEY 설정 확인
+  window.onload = async function() {
+    if (typeof kakao === 'undefined') {
+      alert("카카오맵을 불러오기 실패 (API Key 또는 도메인 설정 확인)");
       return;
     }
 
     initMap();
-    fetchAndRender();
+    await fetchAndRender();
     setInterval(fetchAndRender, 5000);
   };
 
   function initMap() {
     const container = document.getElementById('map');
     const options = {
-      center: new kakao.maps.LatLng(37.7599, 126.7778), // 파주시청
+      center: new kakao.maps.LatLng(37.7599, 126.7778), 
       level: 6
     };
     map = new kakao.maps.Map(container, options);
-    document.getElementById('loading').style.display = 'none';
   }
 
   async function fetchAndRender() {
-    try {
-      const response = await fetch('/api/potholes');
-      const data = await response.json();
+    const response = await fetch('/api/potholes');
+    const data = await response.json();
 
-      // 기존 마커 유지 방지 (중복 제거)
-      for (let id in markers) {
-        markers[id].setMap(null);
-      }
-      markers = {};
+    renderMarkers(data);
+    renderCoords(data);
+    drawChart(data);
+  }
 
-      // 새 마커 표시
-      data.forEach(p => {
-        const marker = new kakao.maps.Marker({
-          map: map,
-          position: new kakao.maps.LatLng(p.latitude, p.longitude)
-        });
-        markers[p.id] = marker;
+  function renderMarkers(data) {
+    // 이전 마커 제거
+    for (let id in markers) markers[id].setMap(null);
+    markers = {};
 
-        const info = `
-          <div style="padding:10px;">
-            <b>ID:</b> ${p.id}<br>
-            <b>심각도:</b> ${p.severity}<br>
-            <b>상태:</b> ${p.status}<br>
-            ${p.image_url ? `<img src="${p.image_url}" width="100" style="margin-top:5px;">` : ''}
-          </div>
-        `;
-        const infowindow = new kakao.maps.InfoWindow({ content: info });
-        kakao.maps.event.addListener(marker, 'click', () => infowindow.open(map, marker));
+    data.forEach(p => {
+      const marker = new kakao.maps.Marker({
+        map: map,
+        position: new kakao.maps.LatLng(p.latitude, p.longitude)
       });
+      markers[p.id] = marker;
 
-      drawChart(data);
-    } catch (error) {
-      console.error("데이터를 불러오는 중 오류:", error);
-    }
+      const info = `
+        <div style="padding:10px;">
+          <b>ID:</b> ${p.id}<br>
+          <b>심각도:</b> ${p.severity}<br>
+          <b>상태:</b> ${p.status}<br>
+          ${p.image_url ? `<img src="${p.image_url}" width="100">` : ""}
+        </div>
+      `;
+      const infowindow = new kakao.maps.InfoWindow({ content: info });
+      kakao.maps.event.addListener(marker, 'click', () => infowindow.open(map, marker));
+    });
+  }
+
+  function renderCoords(data) {
+    const list = document.getElementById('coordList');
+    list.innerHTML = "";
+    data.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)} (${p.status})`;
+      list.appendChild(li);
+    });
   }
 
   function drawChart(potholes) {
