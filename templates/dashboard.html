@@ -1,0 +1,82 @@
+<script>
+let map;
+let markers = {}; 
+
+function initMap() {
+  const container = document.getElementById('map');
+  const options = {
+    center: new kakao.maps.LatLng(37.5665, 126.9780),
+    level: 6
+  };
+  map = new kakao.maps.Map(container, options);
+}
+
+async function fetchAndRender() {
+  const response = await fetch('/api/potholes');
+  const data = await response.json();
+
+  // 데이터 순회
+  data.forEach(p => {
+    // 이미 등록된 마커면 무시
+    if (markers[p.id]) return;
+
+    // 새 마커 추가
+    const marker = new kakao.maps.Marker({
+      map: map,
+      position: new kakao.maps.LatLng(p.latitude, p.longitude)
+    });
+    markers[p.id] = marker;
+
+    const info = `
+      <div style="padding:10px;">
+        <b>ID:</b> ${p.id}<br>
+        <b>심각도:</b> ${p.severity}<br>
+        <b>상태:</b> ${p.status}<br>
+        <img src="${p.image_url}" width="100" style="margin-top:5px;">
+      </div>
+    `;
+    const infowindow = new kakao.maps.InfoWindow({ content: info });
+    kakao.maps.event.addListener(marker, 'click', () => infowindow.open(map, marker));
+  });
+
+  // 보수 완료된 포트홀 제거 
+  for (const id in markers) {
+    const pothole = data.find(p => p.id === id);
+    if (pothole && pothole.status === "Resolved") {
+      markers[id].setMap(null);
+      delete markers[id];
+    }
+  }
+
+  // 차트 갱신
+  drawChart(data);
+}
+
+function drawChart(potholes) {
+  const ctx = document.getElementById('chart').getContext('2d');
+  const resolved = potholes.filter(p => p.status === "Resolved").length;
+  const unresolved = potholes.filter(p => p.status === "Unresolved").length;
+
+  if (window.myChart) window.myChart.destroy();
+  window.myChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['처리 완료', '미처리'],
+      datasets: [{
+        data: [resolved, unresolved],
+        backgroundColor: ['#4CAF50', '#F44336']
+      }]
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: '포트홀 처리 현황' }
+      }
+    }
+  });
+}
+
+// 5초마다 갱신
+initMap();
+fetchAndRender();
+setInterval(fetchAndRender, 5000);
+</script>
