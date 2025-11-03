@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>포트홀 관리 대시보드</title>
+  <title>포트홀 실시간 관리 대시보드</title>
 
   <script type="text/javascript"
-    src="//dapi.kakao.com/v2/maps/sdk.js?appkey={{ api_key }}&libraries=clusterer"></script>
+    src="//dapi.kakao.com/v2/maps/sdk.js?appkey={{ api_key }}&libraries=clusterer">
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; text-align:center; }
     #map { width: 100%; height: 500px; }
     #chart { width: 300px; height: 300px; margin: 20px auto; }
   </style>
 </head>
 <body>
-  <h2 style="text-align:center;">포트홀 실시간 관리 대시보드</h2>
+  <h2>포트홀 실시간 관리 대시보드</h2>
   <div id="map"></div>
   <canvas id="chart"></canvas>
 
@@ -27,7 +29,7 @@
   function initMap() {
     const container = document.getElementById('map');
     const options = {
-      center: new kakao.maps.LatLng(37.5665, 126.9780),
+      center: new kakao.maps.LatLng(37.7599, 126.7778),
       level: 6
     };
     map = new kakao.maps.Map(container, options);
@@ -38,10 +40,31 @@
     const data = await response.json();
 
     data.forEach(p => {
-      if (markers[p.id]) return;
+      if (markers[p.id]) return; // 이미 존재하면 넘김
+
+      // 심각도별 색 구별
+      let markerImage;
+      if (p.severity === "High") {
+        markerImage = new kakao.maps.MarkerImage(
+          "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png",
+          new kakao.maps.Size(32, 32)
+        );
+      } else if (p.severity === "Medium") {
+        markerImage = new kakao.maps.MarkerImage(
+          "https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png",
+          new kakao.maps.Size(32, 32)
+        );
+      } else {
+        markerImage = new kakao.maps.MarkerImage(
+          "https://maps.gstatic.com/mapfiles/ms2/micons/green-dot.png",
+          new kakao.maps.Size(32, 32)
+        );
+      }
+
       const marker = new kakao.maps.Marker({
         map: map,
-        position: new kakao.maps.LatLng(p.latitude, p.longitude)
+        position: new kakao.maps.LatLng(p.latitude, p.longitude),
+        image: markerImage
       });
       markers[p.id] = marker;
 
@@ -56,14 +79,6 @@
       const infowindow = new kakao.maps.InfoWindow({ content: info });
       kakao.maps.event.addListener(marker, 'click', () => infowindow.open(map, marker));
     });
-
-    for (const id in markers) {
-      const pothole = data.find(p => p.id === id);
-      if (pothole && pothole.status === "Resolved") {
-        markers[id].setMap(null);
-        delete markers[id];
-      }
-    }
 
     drawChart(data);
   }
@@ -91,9 +106,11 @@
     });
   }
 
-  initMap();
-  fetchAndRender();
-  setInterval(fetchAndRender, 5000);
+  window.onload = function() {
+    initMap();
+    fetchAndRender();
+    setInterval(fetchAndRender, 5000);
+  };
   </script>
 </body>
 </html>
